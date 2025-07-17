@@ -1,11 +1,16 @@
 import tkinter as tk
 from tkinter import messagebox, ttk
-from tkcalendar import DateEntry
 from datetime import datetime
 import threading
 import json
 import time
 import os
+
+# Try to import tkcalendar DateEntry, else fallback to plain Entry
+try:
+    from tkcalendar import DateEntry
+except ImportError:
+    DateEntry = None
 
 DATA_FILE = "tasks.json"
 
@@ -51,44 +56,57 @@ class TaskManagerApp:
         threading.Thread(target=self.reminder_loop, daemon=True).start()
 
     def build_ui(self):
-        tk.Label(self.root, text="Search:").grid(row=0, column=0, sticky="w", padx=5)
+        # Search
+        tk.Label(self.root, text="Search:").grid(row=0, column=0, sticky="w", padx=5, pady=5)
         self.search_entry = tk.Entry(self.root, width=40)
-        self.search_entry.grid(row=0, column=1, columnspan=3, pady=5)
+        self.search_entry.grid(row=0, column=1, columnspan=3, sticky="w", pady=5)
         self.search_entry.bind("<KeyRelease>", self.filter_tasks)
 
-        tk.Label(self.root, text="Title:").grid(row=1, column=0, sticky="w", padx=5)
+        # Title
+        tk.Label(self.root, text="Title:").grid(row=1, column=0, sticky="w", padx=5, pady=5)
         self.title_entry = tk.Entry(self.root, width=40)
-        self.title_entry.grid(row=1, column=1, columnspan=3, pady=5)
+        self.title_entry.grid(row=1, column=1, columnspan=3, sticky="w", pady=5)
 
-        tk.Label(self.root, text="Description:").grid(row=2, column=0, sticky="w", padx=5)
+        # Description
+        tk.Label(self.root, text="Description:").grid(row=2, column=0, sticky="w", padx=5, pady=5)
         self.desc_entry = tk.Entry(self.root, width=40)
-        self.desc_entry.grid(row=2, column=1, columnspan=3, pady=5)
+        self.desc_entry.grid(row=2, column=1, columnspan=3, sticky="w", pady=5)
 
-        tk.Label(self.root, text="Due Date:").grid(row=3, column=0, sticky="w", padx=5)
-        self.due_date = DateEntry(self.root, date_pattern="yyyy-mm-dd")
-        self.due_date.grid(row=3, column=1, pady=5, sticky="w")
+        # Due Date
+        tk.Label(self.root, text="Due Date:").grid(row=3, column=0, sticky="w", padx=5, pady=5)
+        if DateEntry:
+            self.due_date = DateEntry(self.root, date_pattern="yyyy-mm-dd")
+        else:
+            self.due_date = tk.Entry(self.root, width=12)
+            self.due_date.insert(0, datetime.now().strftime("%Y-%m-%d"))
+        self.due_date.grid(row=3, column=1, sticky="w", pady=5)
 
-        tk.Label(self.root, text="Time (HH:MM):").grid(row=3, column=2, sticky="e")
+        # Time
+        tk.Label(self.root, text="Time (HH:MM):").grid(row=3, column=2, sticky="e", padx=5, pady=5)
         self.time_entry = tk.Entry(self.root, width=10)
-        self.time_entry.grid(row=3, column=3, pady=5, sticky="w")
+        self.time_entry.grid(row=3, column=3, sticky="w", pady=5)
+        self.time_entry.insert(0, datetime.now().strftime("%H:%M"))
 
-        tk.Label(self.root, text="Importance:").grid(row=4, column=0, sticky="w", padx=5)
-        self.importance = ttk.Combobox(self.root, values=["High 🔴", "Medium 🟠", "Low 🟡"])
-        self.importance.grid(row=4, column=1, pady=5, sticky="w")
+        # Importance
+        tk.Label(self.root, text="Importance:").grid(row=4, column=0, sticky="w", padx=5, pady=5)
+        self.importance = ttk.Combobox(self.root, values=["High 🔴", "Medium 🟠", "Low 🟡"], state="readonly", width=12)
+        self.importance.grid(row=4, column=1, sticky="w", pady=5)
         self.importance.set("Medium 🟠")
 
-        tk.Button(self.root, text="➕ Add Task", command=self.add_task).grid(row=4, column=2)
-        tk.Button(self.root, text="✔ Done", command=self.mark_done).grid(row=4, column=3)
-        tk.Button(self.root, text="🗑 Delete", command=self.delete_task).grid(row=5, column=3)
+        # Buttons
+        tk.Button(self.root, text="➕ Add Task", command=self.add_task, width=12).grid(row=4, column=2, padx=5)
+        tk.Button(self.root, text="✔ Done", command=self.mark_done, width=12).grid(row=4, column=3, padx=5)
+        tk.Button(self.root, text="🗑 Delete", command=self.delete_task, width=12).grid(row=5, column=3, padx=5, pady=(0, 10))
 
-        self.task_listbox = tk.Listbox(self.root, width=80, height=15)
+        # Task Listbox
+        self.task_listbox = tk.Listbox(self.root, width=80, height=15, font=("Segoe UI", 10))
         self.task_listbox.grid(row=6, column=0, columnspan=4, padx=10, pady=10)
         self.task_listbox.bind("<<ListboxSelect>>", self.color_selected)
 
     def add_task(self):
         title = self.title_entry.get().strip()
         desc = self.desc_entry.get().strip()
-        date = self.due_date.get_date()
+        date = self.due_date.get() if not DateEntry else self.due_date.get_date()
         time_str = self.time_entry.get().strip()
         importance = self.importance.get()
 
@@ -126,6 +144,9 @@ class TaskManagerApp:
         self.desc_entry.delete(0, tk.END)
         self.time_entry.delete(0, tk.END)
         self.importance.set("Medium 🟠")
+        if not DateEntry:
+            self.due_date.delete(0, tk.END)
+            self.due_date.insert(0, datetime.now().strftime("%Y-%m-%d"))
 
     def filter_tasks(self, event=None):
         q = self.search_entry.get().lower().strip()
@@ -137,12 +158,16 @@ class TaskManagerApp:
         for t in self.filtered_tasks:
             label = f"[{t.status}] {t.title} - {t.due_date} ({t.importance})"
             self.task_listbox.insert(tk.END, label)
+        self.color_all_items()
 
     def color_selected(self, event=None):
         sel = self.task_listbox.curselection()
         if not sel:
             return
-        task = self.filtered_tasks[sel[0]]
+        idx = sel[0]
+        for i in range(self.task_listbox.size()):
+            self.task_listbox.itemconfig(i, fg="black")
+        task = self.filtered_tasks[idx]
         color = "black"
         if "High" in task.importance:
             color = "red"
@@ -150,7 +175,20 @@ class TaskManagerApp:
             color = "orange"
         elif "Low" in task.importance:
             color = "green"
-        self.task_listbox.itemconfig(sel[0], {'fg': color})
+        self.task_listbox.itemconfig(idx, fg=color)
+
+    def color_all_items(self):
+        for idx, task in enumerate(self.filtered_tasks):
+            color = "black"
+            if "High" in task.importance:
+                color = "red"
+            elif "Medium" in task.importance:
+                color = "orange"
+            elif "Low" in task.importance:
+                color = "green"
+            if task.status == "Completed":
+                color = "gray"
+            self.task_listbox.itemconfig(idx, fg=color)
 
     def reminder_loop(self):
         while True:
@@ -162,7 +200,7 @@ class TaskManagerApp:
                         if 0 < (due - now).total_seconds() <= 60:
                             task.notified = True
                             self.root.after(0, lambda t=task: self.show_reminder(t))
-                    except:
+                    except Exception:
                         pass
             time.sleep(10)
 
@@ -170,18 +208,36 @@ class TaskManagerApp:
         threading.Thread(target=self.play_alarm, daemon=True).start()
         popup = tk.Toplevel(self.root)
         popup.title("⏰ Reminder")
-        tk.Label(popup, text=f"'{task.title}' is due at {task.due_date}").pack(pady=10)
-        tk.Button(popup, text="Snooze 5 min", command=lambda: self.snooze(task, popup)).pack(side="left", padx=10)
-        tk.Button(popup, text="Dismiss", command=popup.destroy).pack(side="right", padx=10)
+        popup.geometry("300x120")
+        popup.resizable(False, False)
+
+        tk.Label(popup, text=f"Task '{task.title}' is due at {task.due_date}", wraplength=280, font=("Segoe UI", 11)).pack(pady=10)
+        btn_frame = tk.Frame(popup)
+        btn_frame.pack(pady=5)
+
+        tk.Button(btn_frame, text="Snooze 5 min", width=12, command=lambda: self.snooze(task, popup)).pack(side="left", padx=10)
+        tk.Button(btn_frame, text="Dismiss", width=12, command=popup.destroy).pack(side="right", padx=10)
 
     def snooze(self, task, popup):
         popup.destroy()
         task.notified = False
-        threading.Timer(300, lambda: self.show_reminder(task)).start()
+        # Add 5 minutes to due_date
+        try:
+            due = datetime.strptime(task.due_date, "%Y-%m-%d %H:%M")
+            new_due = due + timedelta(minutes=5)
+            task.due_date = new_due.strftime("%Y-%m-%d %H:%M")
+        except Exception:
+            pass
+        self.filter_tasks()
 
     def play_alarm(self):
+        # macOS sound, replace if on Windows or Linux
         for _ in range(3):
-            os.system("afplay /System/Library/Sounds/Glass.aiff")
+            if os.name == 'posix':
+                os.system("afplay /System/Library/Sounds/Glass.aiff")
+            else:
+                # fallback beep
+                print("\a")
             time.sleep(1)
 
     def load_tasks(self):
@@ -198,5 +254,5 @@ class TaskManagerApp:
 if __name__ == "__main__":
     root = tk.Tk()
     app = TaskManagerApp(root)
-    root.protocol("WM_DELETE_WINDOW", app.save_tasks)
+    root.protocol("WM_DELETE_WINDOW", lambda: (app.save_tasks(), root.destroy()))
     root.mainloop()
