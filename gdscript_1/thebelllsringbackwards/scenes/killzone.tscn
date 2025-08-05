@@ -1,0 +1,19 @@
+[gd_scene load_steps=3 format=3 uid="uid://ki7k6kdcurnm"]
+
+[ext_resource type="Script" uid="uid://dvi2vcgf7urtm" path="res://scenes/killzone.gd" id="1_xlapc"]
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_xlapc"]
+size = Vector2(59432.5, 151)
+
+[node name="Killzone" type="Area2D"]
+collision_mask = 2
+script = ExtResource("1_xlapc")
+
+[node name="Timer" type="Timer" parent="."]
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="."]
+position = Vector2(16, -6)
+shape = SubResource("RectangleShape2D_xlapc")
+
+[connection signal="body_entered" from="." to="." method="_on_body_entered"]
+[connection signal="timeout" from="Timer" to="." method="_on_timer_timeout"]
